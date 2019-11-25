@@ -2,16 +2,16 @@
 import click
 import requests
 import os
+from datetime import datetime
+from . import utils
 
 """Main module."""
 
 
 def main():
-    # if codebuild environment
-    # parse codebuild data
     is_codebuild = "CODEBUILD_CI" in os.environ
     if not is_codebuild:
-        click.echo("Not in an AWS Codebuild Environment")
+        click.echo("Not in an AWS Codebuild Environment", err=True)
         return
 
     payload = build_codebuild_payload()
@@ -22,14 +22,13 @@ def build_codebuild_payload():
     build_number = os.getenv("CODEBUILD_BUILD_NUMBER")
     build_id = os.getenv("CODEBUILD_BUILD_ID")
     project_name = build_id.split(":")[0]
-    start_time_stamp = os.getenv("CODEBUILD_START_TIME")
-    aws_reqion = os.getenv("AWS_DEFAULT_REGION")
     branch_name = os.getenv("CODEBUILD_WEBHOOK_TRIGGER").split("/")[-1]
     git_repo = os.getenv("CODEBUILD_SOURCE_REPO_URL").replace(".git", "")
     source_version = os.getenv("CODEBUILD_SOURCE_VERSION")
     codebuild_url = os.getenv("CODEBUILD_BUILD_URL")
 
     commit_url = f"{git_repo}/commit/{source_version}"
+
     status = "Failed"
     color = "#CC0000"
     if os.getenv("CODEBUILD_BUILD_SUCCEEDING") == "1":
@@ -37,7 +36,9 @@ def build_codebuild_payload():
         color = "#0cab27"
 
     text = f"*{project_name}*\nBuild <{codebuild_url}|#{build_number}> *{status}*"
-    context_text = f"*Branch:* {branch_name}\n*Commit:* <{commit_url}|{source_version[:6]}>\n*Build Time:* 4 minutes 30 seconds "
+
+    build_time_text = calculate_build_time_text()
+    context_text = f"*Branch:* {branch_name}\n*Commit:* <{commit_url}|{source_version[:6]}>\n*Build Time:* {build_time_text}"
 
     payload = {
         "attachments": [
@@ -55,12 +56,7 @@ def build_codebuild_payload():
                     },
                     {
                         "type": "context",
-                        "elements": [
-                            {
-                                "type": "mrkdwn",
-                                "text": context_text
-                            }
-                        ],
+                        "elements": [{"type": "mrkdwn", "text": context_text}],
                     },
                 ],
             }
@@ -70,28 +66,16 @@ def build_codebuild_payload():
     return payload
 
 
+def calculate_build_time_text():
+    start_time_stamp = int(os.getenv("CODEBUILD_START_TIME")) / 1000
+    start_dt_object = datetime.fromtimestamp(start_time_stamp)
+    delta = datetime.now() - start_dt_object
+    return utils.seconds_to_text(delta.seconds)
+
+
 def send_slack_message(payload):
-    url = (
-        "https://hooks.slack.com/services/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"
-    )
-    requests.post(url, json=payload)
-
-
-def test_slack_message():
-    url = (
-        "https://hooks.slack.com/services/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"
-    )
-    payload = {
-        "fallback": "Required text summary of the attachment that is shown by clients that understand attachments but choose not to show them.",
-        "text": "Optional text that should appear within the attachment",
-        "pretext": "Optional text that should appear above the formatted data",
-        "color": "#36a64f",  # Can either be one of 'good', 'warning', 'danger', or any hex color code
-        "fields": [
-            {
-                "title": "Required Field Title",  # The title may not contain markup and will be escaped for you
-                "value": "Text value of the field. May contain standard message markup and must be escaped as normal. May be multi-line.",
-                "short": False,  # Optional flag indicating whether the `value` is short enough to be displayed side-by-side with other values
-            }
-        ],
-    }
+    url = os.getenv("SLACK_URL")
+    if not url:
+        click.echo("No Slack url provided", err=True)
+        return
     requests.post(url, json=payload)
