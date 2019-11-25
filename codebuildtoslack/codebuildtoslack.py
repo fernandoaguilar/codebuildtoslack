@@ -16,6 +16,7 @@ def main():
 
     payload = build_codebuild_payload()
     send_slack_message(payload)
+    click.echo('Slack message sent')
 
 
 def build_codebuild_payload():
@@ -67,9 +68,9 @@ def build_codebuild_payload():
 
 
 def calculate_build_time_text():
-    start_time_stamp = int(os.getenv("CODEBUILD_START_TIME")) / 1000
+    start_time_stamp = float(os.getenv("CODEBUILD_START_TIME")) / 1000
     start_dt_object = datetime.fromtimestamp(start_time_stamp)
-    delta = datetime.now() - start_dt_object
+    delta = datetime.utcnow() - start_dt_object
     return utils.seconds_to_text(delta.seconds)
 
 
