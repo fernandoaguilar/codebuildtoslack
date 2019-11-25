@@ -16,7 +16,7 @@ def main():
 
     payload = build_codebuild_payload()
     send_slack_message(payload)
-    click.echo('Slack message sent')
+    click.echo("Slack message sent")
 
 
 def build_codebuild_payload():
